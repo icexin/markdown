@@ -7,4 +7,10 @@ Overview
 Usage
 =====
 
+### Parse markdown file
+
 `cat README.md | markdown`  or `markdown README.md`
+
+### As an static file server
+
+`markdown -server`
