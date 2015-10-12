@@ -11,7 +11,7 @@ import (
 	"strings"
 	"text/template"
 
-	"github.com/russross/blackfriday"
+	md "github.com/russross/blackfriday"
 )
 
 const tpl = `
@@ -31,18 +31,45 @@ const tpl = `
 </html>
 `
 
+const (
+	commonHTMLFlags = 0 |
+		md.HTML_USE_XHTML |
+		md.HTML_USE_SMARTYPANTS |
+		md.HTML_SMARTYPANTS_FRACTIONS |
+		md.HTML_SMARTYPANTS_LATEX_DASHES
+
+	commonExtensions = 0 |
+		md.EXTENSION_NO_INTRA_EMPHASIS |
+		md.EXTENSION_TABLES |
+		md.EXTENSION_FENCED_CODE |
+		md.EXTENSION_AUTOLINK |
+		md.EXTENSION_STRIKETHROUGH |
+		md.EXTENSION_SPACE_HEADERS |
+		md.EXTENSION_HEADER_IDS |
+		md.EXTENSION_BACKSLASH_LINE_BREAK |
+		md.EXTENSION_DEFINITION_LISTS
+)
+
 var (
 	asServer = flag.Bool("server", false, "run as server")
 	addr     = flag.String("addr", ":8080", "server address")
 	root     = flag.String("root", ".", "server root")
+	toc      = flag.Bool("toc", false, "table of content")
 )
 
-func Markdown(in io.Reader, out io.Writer) error {
+func markdown(in io.Reader, out io.Writer) error {
 	buf, err := ioutil.ReadAll(in)
 	if err != nil {
 		return err
 	}
-	body := blackfriday.MarkdownCommon(buf)
+	flg := commonHTMLFlags
+	if *toc {
+		flg |= md.HTML_TOC
+	}
+	render := md.HtmlRenderer(flg, "", css)
+	body := md.MarkdownOptions(buf, render, md.Options{
+		Extensions: commonExtensions,
+	})
 	m := map[string]interface{}{
 		"css":  css,
 		"body": string(body),
@@ -62,7 +89,7 @@ func runcli() {
 		r = f
 	}
 
-	err := Markdown(r, os.Stdout)
+	err := markdown(r, os.Stdout)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -91,7 +118,7 @@ func serveMarkdown(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	defer f.Close()
-	err = Markdown(f, w)
+	err = markdown(f, w)
 	if err != nil {
 		code = 500
 		return
